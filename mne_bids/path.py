@@ -613,10 +613,12 @@ class BIDSPath(object):
             # extension is not an entity, so get it explicitly
             _, extension = _parse_ext(fname, verbose=False)
 
-            # get datatype
+            # get datatype since the datatype is already parsed
+            # for above
             fpath = list(self.root.rglob(f'*{fname}*'))[0]
             datatype = _infer_datatype_from_path(fpath)
 
+            # form the BIDS path
             bids_path = BIDSPath(root=self.root, datatype=datatype,
                                  extension=extension, **entities)
             bids_paths.append(bids_path)
