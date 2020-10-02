@@ -624,7 +624,6 @@ def test_match(return_bids_test_dir):
     assert paths[0].suffix == 'channels'
     assert Path(paths[0]).parent.name == 'meg'
 
-
     # Check handling of `datatype` when explicitly passe din
     print_dir_tree(bids_root)
     bids_path_01 = BIDSPath(root=bids_root, run='01',
