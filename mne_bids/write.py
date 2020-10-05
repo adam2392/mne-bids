@@ -1592,3 +1592,72 @@ def write_meg_crosstalk(fname, bids_path, verbose=None):
     logger.info(f'Writing crosstalk file to {out_path}')
     out_path.mkdir()
     shutil.copyfile(src=fname, dst=str(out_path))
+
+def update_sidecars(sidecar_template_fname, bids_path, verbose=True):
+    """Update sidecar files via a template.
+
+    Currently supports overwriting any ``.json`` sidecar file,
+    ``electrodes.tsv`` and ``channels.tsv`` sidecar files.
+
+    Parameters
+    ----------
+    sidecar_template_fname : str | pathlib.Path
+    bids_path : BIDSPath
+    verbose : bool
+
+    Returns
+    -------
+    sidecar_tmp : dict
+        The sidecar template used to overwrite files.
+    """
+    # TODO: add support for events.tsv, behav.tsv
+    # Read in sidecar template and get default & template fields
+    with open(sidecar_template_fname, "r") as tmp_f:
+        sidecar_tmp = json.load(tmp_f, object_pairs_hook=OrderedDict)
+
+    # get all bids path files matching pattern
+    sidecar_files = bids_path.match()
+
+    for fname in sidecar_files:
+        base_fname = fname.fpath.name
+        # read in the sidecar file
+        if fname.fpath.suffix == '.json':
+            with open(fname, "r") as tmp_f:
+                sidecar = json.load(tmp_f, object_pairs_hook=OrderedDict)
+        elif fname.fpath.suffix == '.tsv':
+            if not base_fname.endswith('channels.tsv') and not base_fname.endswith('electrodes.tsv'):
+                raise RuntimeError('Only supports overwriting channels and '
+                                   'electrodes tsv files right now.')
+            sidecar = _from_tsv(fname.fpath)
+        else:
+            raise RuntimeError('Can only overwrite sidecars with '
+                               '.json, or .tsv extensions. Please '
+                               'reconfigure the BIDSPath object passed '
+                               f'in. It currently is {bids_path}.')
+
+        # get the keys from both sidecar file and the template
+        default_fields = set(sidecar.keys())
+        template_fields = set(sidecar_tmp.keys())
+
+        # Use field order in template to sort default keys, if values are None
+        not_in_template = default_fields.difference(template_fields)
+        only_in_template = template_fields.difference(default_fields)
+        in_both = template_fields.intersection(default_fields)
+        for field in only_in_template:
+            if sidecar_tmp[field] == None:
+                sidecar_tmp.pop(field)
+        field_order = list(not_in_template) + list(sidecar_tmp.keys())
+        for field in in_both:
+            if sidecar_tmp[field] == None:
+                sidecar_tmp.pop(field)
+
+        # Update values in generate sidecar with non-None values in template
+        sidecar.update(sidecar_tmp)
+
+        # Sort updated sidecar according to sort order in template
+        sorted_info = [(field, sidecar[field]) for field in field_order]
+        sidecar = OrderedDict(sorted_info)
+
+        _write_json(fname, sidecar, overwrite=True, verbose=verbose)
+
+    return sidecar_tmp
